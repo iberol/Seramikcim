@@ -1,6 +1,28 @@
 # Seramikcim — Release Notes (Demo-Ready)
 
-## v3.0 — Face-Based Geometry Pipeline
+## v1.0.0 — İlk Kamuya Açık Sürüm (MVP)
+
+Seramik metraj + fire + kesim optimizasyonu yazılımının ilk etiketli sürümü.
+
+**Öne çıkanlar**
+- **İç-duvar tespiti (ray-cast görünürlük):** oda hacminin içinden atılan ışınlarla
+  yalnız iç yüzeyler seçilir; dış kabuk, arka yüzler ve duvar kopyaları otomatik elenir.
+  Çakışık zıt-yüz çiftleri tekilleştirilir (çift sayım önlenir).
+- **Per-yüzey 2B çıkarım:** her duvar/zemin kendi düzlemine projekte edilip gerçek
+  poligonu (eğri, L, açılı, girintili dahil) çıkarılır; metraj bu poligondan yapılır.
+- **Metraj & fire:** alan-tabanlı adet, desen-bazlı minimum kesim fire'si (düz %10,
+  diyagonal %15, balıksırtı %20), derz etkisi, kutu ve fireli sipariş.
+- **Kesim optimizasyonu:** artık parça yeniden kullanımı + kesim planı raporu.
+- **3B sahne (R3F):** per-model mesh hizalama, Yüzey Editörü (Zemin/duvar/tümü +
+  3B Face Select), bölge/boşluk-niş/eşya yerleşimi, kamera görünümleri (Genel/Üst/Zemin),
+  **reload'suz model geçişi** (tek WebGL context).
+- **Kalite:** 169 JS + 141 Python birim testi (tümü geçer), üretim derlemesi başarılı.
+
+**Bilinen sınırlar:** `KNOWN_LIMITATIONS.md`.
+
+---
+
+## v3.0 — Face-Based Geometry Pipeline (iç sürüm geçmişi)
 
 OBJ mesh pipeline tamamen yeniden yazıldı: section/cluster/snap kaldırıldı,
 **her co-planar face grubu = ayrı wall/floor/ceiling surface** (matematiksel 3D vektör).
