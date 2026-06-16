@@ -1,0 +1,50 @@
+{
+  "name": "seramikcim-3d-viewer",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -n vite,api -c green,blue \"npm run dev:vite\" \"npm run api\"",
+    "dev:vite": "vite",
+    "dev:full": "npm run dev",
+    "api": "python -m uvicorn api.main:app --reload --port 8000",
+    "build": "vite build",
+    "preview": "vite preview",
+    "gui": "python cad_loader_gui.py",
+    "prepare:cad": "python prepare_simulation.py",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:py": "python -m pytest tests/ -v",
+    "test:py:coverage": "python -m pytest tests/ --cov=dxf_to_3d --cov=prepare_simulation --cov=api --cov-report=term --cov-report=html:coverage/python",
+    "test:all": "npm run test && npm run test:py",
+    "test:all:coverage": "npm run test:coverage && npm run test:py:coverage",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:debug": "playwright test --debug",
+    "test:full": "npm run test:all && npm run test:e2e",
+    "dev:logged": "node scripts/dev-logged.js",
+    "test:ci": "npm run build && npm run test:all"
+  },
+  "dependencies": {
+    "@react-three/drei": "^10.7.7",
+    "@react-three/fiber": "^9.6.1",
+    "bootstrap": "^5.3.8",
+    "konva": "^10.3.0",
+    "leva": "^0.10.1",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "react-konva": "^19.2.4",
+    "three": "^0.184.0",
+    "vite": "^8.0.9",
+    "zustand": "^5.0.13"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.60.0",
+    "@vitejs/plugin-react": "^6.0.2",
+    "@vitest/coverage-v8": "^4.1.6",
+    "concurrently": "^9.2.1",
+    "jsdom": "^29.1.1",
+    "vitest": "^4.1.6"
+  }
+}

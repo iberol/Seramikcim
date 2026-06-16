@@ -1,0 +1,28 @@
+# Seramikcim — Python bağımlılıkları
+# Kurulum: python -m pip install -r requirements.txt
+# Python 3.10+ önerilir (test ortamı 3.10 ve 3.11 üzerinde doğrulandı).
+
+# DXF işleme
+ezdxf>=1.4
+
+# Geometri / mesh
+shapely>=2.0
+numpy>=1.24
+trimesh>=4.0
+rtree>=1.0
+manifold3d>=3.0
+
+# FastAPI catalog
+fastapi>=0.110
+uvicorn[standard]>=0.27
+httpx>=0.27
+
+# Test
+pytest>=8.0
+pytest-cov>=4.1
+
+# Opsiyonel — DWG dönüşüm (alternatiflerden biri):
+#   aspose-cad>=24.0           # commercial, en hızlı
+# veya sistem yolu:
+#   LibreDWG dwg2dxf            # conda install -c conda-forge libredwg
+#   ODA File Converter          # https://www.opendesign.com/guestfiles/oda_file_converter

@@ -1,0 +1,39 @@
+node_modules/
+dist/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.hypothesis/
+coverage/
+.coverage
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Local runtime output
+uploads/
+vite-dev*.log
+*_rapor.txt
+logs/*.log
+
+# Playwright
+test-results/
+playwright-report/
+playwright/.cache/
+
+# Generated active simulation data
+public/current_geometry.json
+public/current_building.json
+public/current_comparison.json
+
+# Local CAD conversion artifacts
+*_converted_*.dxf
+*_converted_*.dwg
+
+# Üçüncü taraf vendored ikili dosyalar (ayrıca indirilir — telif kapsamı dışı)
+tools/libredwg/*.dll
+tools/libredwg/*.exe
+tools/libredwg/*.so
+tools/libredwg/*.dylib

@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="tr" data-bs-theme="dark" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Seramikcim — Envanterli seramik kaplama simülasyonu ve sipariş hesaplama aracı. DXF/OBJ oda dosyasından otomatik hesaplama." />
+    <meta name="theme-color" content="#0d1117" />
+    <meta property="og:title" content="Seramikcim — Kaplama Simülasyonu" />
+    <meta property="og:description" content="Banyo ve mutfak seramik döşeme simülatörü. Kesim planı, envanter ve maliyet hesabı." />
+    <title>Seramikcim — Envanterli Kaplama Simülasyonu</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body class="d-flex flex-column" style="height:100vh; overflow:hidden;">
+
+    <!-- ── HEADER ─────────────────────────────────────────────────────────── -->
+    <header class="app-header flex-shrink-0 d-flex align-items-center justify-content-between px-3 py-2 border-bottom">
+      <div class="d-flex align-items-center gap-3">
+        <div class="d-flex align-items-center gap-2">
+          <div class="brand-mark">S</div>
+          <span class="fw-bold brand-name">Seramikcim</span>
+        </div>
+        <div class="input-group input-group-sm" style="width:220px;">
+          <span class="input-group-text header-input-label">MODEL</span>
+          <select class="form-select form-select-sm" id="model-select"></select>
+        </div>
+        <span id="source-label" class="source-label d-none d-md-inline"></span>
+        <span id="wireframe-status-chip" class="badge d-none wireframe-status-chip"></span>
+      </div>
+
+      <!-- Kamera Görünüm Butonları -->
+      <div class="d-flex align-items-center gap-1 mx-3">
+        <button class="btn btn-sm chip-btn" data-view="general" title="Genel Görünüm">⬡ Genel</button>
+        <button class="btn btn-sm chip-btn" data-view="top" title="Üstten Görünüm">⊞ Üst</button>
+        <button class="btn btn-sm chip-btn" data-view="floor" title="Zemin Görünümü">▭ Zemin</button>
+      </div>
+
+      <div class="d-flex align-items-center gap-2 project-meta">
+        <button class="header-btn" id="launcher-open-btn" title="CAD Hazırlayıcı">⚙ Hazırla</button>
+        <button class="header-btn" id="commerce-open-btn" title="Ürün Yönetimi">🛒 Ürünler</button>
+        <button class="header-btn" id="cad-toggle-btn" title="Konva CAD (Ctrl+K)">📐 CAD</button>
+        <button class="header-btn" id="print-report-btn" title="PDF Rapor">↓ PDF</button>
+      </div>
+    </header>
+
+    <!-- ── MAIN LAYOUT ────────────────────────────────────────────────────── -->
+    <main class="d-flex flex-grow-1" style="overflow:hidden;min-height:0;">
+
+      <!-- Sol Sidebar: Yüzey Editörü -->
+      <aside class="editor-panel d-flex flex-column flex-shrink-0 border-end overflow-auto"
+             id="editor-panel">
+        
+        <h6 class="section-title mb-3">Yüzey Editörü</h6>
+
+        <div class="mb-2">
+          <label class="form-label" for="surface-select">Yüzey</label>
+          <select class="form-select form-select-sm" id="surface-select">
+            <option value="floor">Zemin</option>
+            <option value="wall">Seçili duvar</option>
+            <option value="walls">Tüm duvarlar</option>
+            <option value="all">Zemin + duvarlar</option>
+          </select>
+        </div>
+
+        <div class="mb-2">
+          <label class="form-label" for="wall-select">Duvar</label>
+          <select class="form-select form-select-sm" id="wall-select"></select>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label" for="default-tile-select">Ana Seramik</label>
+          <select class="form-select form-select-sm" id="default-tile-select"></select>
+        </div>
+
+        <div class="row g-2 mb-3">
+          <div class="col-6">
+            <label class="form-label" for="grout-select">Derz (mm)</label>
+            <select class="form-select form-select-sm" id="grout-select"></select>
+          </div>
+          <div class="col-6">
+            <label class="form-label" for="waste-input">Fire %</label>
+            <input class="form-control form-control-sm" id="waste-input" type="number" min="0" max="40" step="1" value="10" />
+          </div>
+        </div>
+
+        <div class="row g-2 mb-3">
+          <div class="col-6">
+            <label class="form-label" for="origin-select">Başlangıç</label>
+            <select class="form-select form-select-sm" id="origin-select">
+              <option value="left-bottom">Sol alt</option>
+              <option value="center-bottom">Orta alt</option>
+              <option value="right-bottom">Sağ alt</option>
+              <option value="click">Tıklanan</option>
+            </select>
+          </div>
+          <div class="col-6">
+            <label class="form-label" for="orientation-select">Yön</label>
+            <select class="form-select form-select-sm" id="orientation-select">
+              <option value="horizontal">Yatay</option>
+              <option value="vertical">Düşey</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="app-section__divider mb-3"></div>
+
+        <h6 class="section-title mb-2">Bölge Ekle</h6>
+        <div class="mb-2">
+          <input class="form-control form-control-sm" id="region-name-input" placeholder="WC arkası, duş önü..." />
+        </div>
+        <div class="mb-2">
+          <select class="form-select form-select-sm" id="region-tile-select"></select>
+        </div>
+        <div class="row g-1 mb-2">
+          <div class="col-3"><input class="form-control form-control-sm" id="region-x-input" type="number" step="0.05" placeholder="X m" /></div>
+          <div class="col-3"><input class="form-control form-control-sm" id="region-y-input" type="number" step="0.05" placeholder="Y m" /></div>
+          <div class="col-3"><input class="form-control form-control-sm" id="region-w-input" type="number" step="0.05" placeholder="G m" /></div>
+          <div class="col-3"><input class="form-control form-control-sm" id="region-h-input" type="number" step="0.05" placeholder="Y m" /></div>
+        </div>
+        <button class="btn btn-sm btn-primary w-100 mb-2" id="add-region-btn">+ Bölge Ekle</button>
+        <div id="region-list" class="mb-3" style="font-size:12px;"></div>
+
+        <div class="app-section__divider mb-3"></div>
+
+        <h6 class="section-title mb-2">Boşluk / Niş</h6>
+        <div class="row g-2 mb-2">
+          <div class="col-8">
+            <select class="form-select form-select-sm" id="opening-type-select">
+              <option value="door">Kapı</option>
+              <option value="window">Pencere</option>
+              <option value="niche">Niş</option>
+            </select>
+          </div>
+          <div class="col-4 d-flex align-items-center">
+            <div class="form-check form-switch m-0">
+              <input class="form-check-input" type="checkbox" id="opening-subtract-input" checked>
+              <label class="form-check-label" for="opening-subtract-input" style="font-size:11px;">Düş</label>
+            </div>
+          </div>
+        </div>
+        <div class="row g-1 mb-2">
+          <div class="col-3"><input class="form-control form-control-sm" id="opening-x-input" type="number" step="0.05" placeholder="X m" /></div>
+          <div class="col-3"><input class="form-control form-control-sm" id="opening-y-input" type="number" step="0.05" placeholder="Y m" /></div>
+          <div class="col-3"><input class="form-control form-control-sm" id="opening-w-input" type="number" step="0.05" placeholder="G m" /></div>
+          <div class="col-3"><input class="form-control form-control-sm" id="opening-h-input" type="number" step="0.05" placeholder="Y m" /></div>
+        </div>
+        <button class="btn btn-sm btn-secondary w-100 mb-2" id="add-opening-btn">+ Boşluk / Niş</button>
+        <div id="opening-list" class="mb-3" style="font-size:12px;"></div>
+
+        <div class="app-section__divider mb-3"></div>
+
+        <h6 class="section-title mb-2">Eşya Yerleşimi</h6>
+        <div class="mb-2">
+          <select class="form-select form-select-sm" id="fixture-select"></select>
+        </div>
+        <div class="row g-2 mb-2">
+          <div class="col-6"><input class="form-control form-control-sm" id="fixture-x-input" type="number" step="0.05" placeholder="X m" /></div>
+          <div class="col-6"><input class="form-control form-control-sm" id="fixture-z-input" type="number" step="0.05" placeholder="Z m" /></div>
+        </div>
+        <button class="btn btn-sm btn-secondary w-100 mb-2" id="add-fixture-btn">+ Eşyayı Yerleştir</button>
+        <div id="fixture-list" style="font-size:12px;"></div>
+      </aside>
+
+      <!-- ── MERKEZ: 3D Sahne + Alt Sonuç Paneli ───────────────────────── -->
+      <section class="d-flex flex-column flex-grow-1" style="min-width:0; overflow:hidden;">
+
+        <!-- 3D Canvas (React R3F mount noktası) -->
+        <div id="viewer-canvas" class="flex-grow-1 position-relative" style="min-height:0; overflow:hidden;"></div>
+
+        <!-- Alt Sonuç Paneli (resizable) -->
+        <div class="result-panel flex-shrink-0 border-top" id="result-panel">
+          <div class="result-grid result-grid--stats d-grid px-3 py-2">
+            <div class="result-stat">
+              <strong id="result-area" class="result-value result-value--area">—</strong>
+              <span>Kaplanacak m²</span>
+            </div>
+            <div class="result-stat">
+              <strong id="result-required" class="result-value result-value--count">—</strong>
+              <span>Gerekli Adet</span>
+            </div>
+            <div class="result-stat">
+              <strong id="result-order" class="result-value result-value--order">—</strong>
+              <span>Fireli Sipariş</span>
+            </div>
+            <div class="result-stat">
+              <strong id="result-cuts" class="result-value result-value--cuts">—</strong>
+              <span>Kesim</span>
+            </div>
+          </div>
+
+          <div class="d-flex gap-0" style="min-height:0;">
+            <div class="result-col border-end">
+              <div class="result-col-header">Envanter Özeti</div>
+              <div id="report-inventory-list" class="result-col-body"></div>
+            </div>
+            <div class="result-col border-end">
+              <div class="result-col-header">Kesim Planı</div>
+              <div id="cut-plan-list" class="result-col-body"></div>
+            </div>
+            <div class="result-col border-end">
+              <div class="result-col-header">Ürün Dağılımı</div>
+              <div id="product-chart" class="result-col-body"></div>
+            </div>
+            <div class="result-col border-end">
+              <div class="result-col-header">Artan / Uyarı</div>
+              <div id="reuse-list" class="result-col-body"></div>
+            </div>
+            <div class="result-col">
+              <div class="result-col-header">Uyarılar</div>
+              <div id="warning-list" class="result-col-body"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- ══ FLOATING DRAWERS (body scope — tüm layout dışında) ════════════ -->
+
+    <!-- CAD Hazırlayıcı -->
+    <div class="floating-drawer d-none" id="launcher-panel" role="dialog" aria-modal="true" aria-label="CAD Hazırlayıcı">
+      <div class="floating-drawer__header">
+        <span class="floating-drawer__title">⚙ CAD Hazırlayıcı</span>
+        <button class="btn-close btn-close-white" id="launcher-close-btn" aria-label="Kapat"></button>
+      </div>
+      <div class="floating-drawer__body">
+        <label class="form-label small mb-1">CAD Dosyası</label>
+        <select class="form-select form-select-sm mb-3" id="launcher-cad-select"></select>
+        <div class="d-flex gap-2 mb-3">
+          <button class="btn btn-sm btn-outline-secondary flex-grow-1" id="launcher-refresh-btn">↺ Yenile</button>
+          <button class="btn btn-sm btn-primary flex-grow-1" id="launcher-run-btn">▶ Hazırla ve Aç</button>
+        </div>
+        <div class="launcher-status-box" id="launcher-status">
+          Hazır dosya listesi yükleniyor...
+        </div>
+      </div>
+    </div>
+
+    <!-- Commerce / Ürün Yönetimi -->
+    <div class="floating-drawer floating-drawer--wide d-none" id="commerce-drawer" role="dialog" aria-modal="true" aria-label="Ürün Yönetimi">
+      <div class="floating-drawer__header">
+        <span class="floating-drawer__title">🛒 Ürün Yönetimi</span>
+        <button class="btn-close btn-close-white" id="commerce-close-btn" aria-label="Kapat"></button>
+      </div>
+      <div class="floating-drawer__body d-flex p-0" style="overflow:hidden; flex:1;">
+        <!-- Sidebar -->
+        <div class="flex-shrink-0 p-3 border-end overflow-auto commerce-sidebar-inner">
+          <nav class="commerce-tabs d-flex flex-column gap-1 mb-3" aria-label="Ürün sekmeleri">
+            <button class="btn btn-sm text-start nav-tab-btn active" data-commerce-tab="store">📦 Mağaza</button>
+            <button class="btn btn-sm text-start nav-tab-btn" data-commerce-tab="inventory">📋 Envanter</button>
+            <button class="btn btn-sm text-start nav-tab-btn" data-commerce-tab="detail">🔍 Ürün Detayı</button>
+          </nav>
+          <input class="form-control form-control-sm mb-2" id="commerce-query" placeholder="Ürün ara..." />
+          <select class="form-select form-select-sm mb-2" id="commerce-category">
+            <option value="all">Tüm Kategoriler</option>
+            <option value="tile">Seramik</option>
+            <option value="fixture">Armatür</option>
+            <option value="accessory">Aksesuar</option>
+          </select>
+          <select class="form-select form-select-sm mb-2" id="commerce-type">
+            <option value="all">Tüm Tipler</option>
+            <option value="tile">Tile</option>
+          </select>
+          <select class="form-select form-select-sm mb-2" id="commerce-surface">
+            <option value="all">Tüm Yüzeyler</option>
+            <option value="mat">Mat</option>
+            <option value="parlak">Parlak</option>
+          </select>
+          <select class="form-select form-select-sm mb-2" id="commerce-size">
+            <option value="all">Tüm Boyutlar</option>
+            <option value="30x30">30×30</option>
+            <option value="60x60">60×60</option>
+            <option value="30x60">30×60</option>
+            <option value="20x40">20×40</option>
+          </select>
+          <select class="form-select form-select-sm" id="commerce-sort">
+            <option value="name">İsme göre</option>
+            <option value="price-asc">Fiyat ↑</option>
+            <option value="price-desc">Fiyat ↓</option>
+          </select>
+        </div>
+        <!-- İçerik -->
+        <div class="flex-grow-1 p-3 overflow-auto">
+          <div id="commerce-store-page">
+            <div id="commerce-store-list" class="row g-2"></div>
+          </div>
+          <div id="commerce-inventory-page" class="d-none">
+            <div id="commerce-inventory-list"></div>
+          </div>
+          <div id="commerce-detail-page" class="d-none">
+            <div id="commerce-detail-view"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="loading-overlay">
+      <div class="spinner-border loading-overlay__spinner" role="status">
+        <span class="visually-hidden">Yükleniyor...</span>
+      </div>
+      <div class="loading-overlay__title">Model yükleniyor…</div>
+      <div class="loading-overlay__subtitle">Seramikcim Simülatörü başlatılıyor</div>
+    </div>
+
+    <script type="module" src="main.js"></script>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

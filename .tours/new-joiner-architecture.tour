@@ -1,0 +1,87 @@
+{
+  "$schema": "https://aka.ms/codetour-schema",
+  "title": "Seramikcim — Mimari Turu (Yeni Geliştirici)",
+  "description": "Bu tur seni Seramikcim'in mimarisinde adım adım gezdirir: hybrid Python pipeline (DXF/DWG/OBJ → JSON) + Vite/React/Three.js frontend + FastAPI catalog. Tur sonunda hangi dosyaya neyi eklemen gerektiğini bileceksin.",
+  "ref": "main",
+  "steps": [
+    {
+      "file": "README.md",
+      "line": 1,
+      "title": "1 · Proje Nedir",
+      "description": "**S:** Seramikcim — DWG/DXF/OBJ banyo çizimlerini 3D web simülasyonuna çeviren yerel masaüstü/web hybrid uygulamadır.\n\n**M:** İki dünya birleşir: Python pipeline (geometri çıkarma) + Vite/React frontend (3D render + seramik hesap). FastAPI yerel katalog endpoint'i sunar.\n\n**I:** Yeni geliştirici olarak ilk anlaman gereken: bu **tek bir Vite app değil**. Backend Python script'leri + Vite + FastAPI üçlüsü `concurrently` ile birlikte çalışır. \n\n**G:** `npm run dev` artık sadece Vite değil, hem Vite (5173) hem FastAPI (8000) başlatır. Tek başına vite için `npm run dev:vite`."
+    },
+    {
+      "directory": ".",
+      "title": "2 · Kök Klasör Anatomisi",
+      "description": "**S:** Root'ta hem Python hem JS karışık. Bu kasıtlı.\n\n**M:** Kategoriler:\n- **Python pipeline (root):** `prepare_simulation.py`, `dxf_to_3d.py`, `mesh_to_3d.py`, `cad_loader_gui.py`\n- **Legacy JS (root):** `main.js`, `scene.js`, `state.js`, `commerce.js`, `cad.js`, `calculation.js`, `scene-stub.js`\n- **Modern JS (src/):** React + R3F + Zustand\n- **API (api/):** FastAPI\n- **Data (public/):** runtime JSON + statik catalog\n- **Tests (tests/):** vitest + pytest\n- **Demo data:** `ornekler/` (DXF/DWG), `Obj/` (mesh)\n\n**I:** Root'taki .js dosyaları **legacy katman** — projeyi büyüten geçici migration sürecinden geriye kalan. Yeni iş çoğunlukla `src/`'ye yazılır.\n\n**G:** `state.js`, `commerce.js`, `cad.js` hâlâ kullanımda (main.js'ten import edilir). Silinmedi, sadece Zustand'a yan yana eklendi (window bridge ile)."
+    },
+    {
+      "file": "index.html",
+      "line": 11,
+      "title": "3 · Çift Mount Mimarisi",
+      "description": "**S:** `<div id=\"viewer-canvas\">` — 3D sahne mount noktası.\n\n**M:** Ama bu div'e **iki ayrı dünya** mount edilir:\n1. `<script type=\"module\" src=\"main.js\">` (satır 328) — legacy DOM event bind, panels, commerce, CAD drawer\n2. `<script type=\"module\" src=\"/src/main.jsx\">` (satır 329) — React + R3F sahne\n\n**I:** Bu çift mount **paralel çalışıyor**. Legacy main.js header'ı, editor panel'i, sonuç panelini yönetir (vanilla JS). React sadece 3D sahneyi mount eder.\n\n**G:** Bir özellik eklerken iki kez düşün: \"3D mi (R3F'e ekle) yoksa UI panel mi (main.js + state.js'e ekle)\"? İkisi Zustand store + window.__seramikcim bridge ile senkron olur."
+    },
+    {
+      "file": "main.js",
+      "line": 7,
+      "title": "4 · Legacy Entry: scene-stub Köprüsü",
+      "description": "**S:** main.js `scene-stub.js`'i import ediyor — `scene.js` değil.\n\n**M:** [scene-stub.js:15](scene-stub.js#L15) `createSceneController`'ı no-op stub olarak yeniden tanımlar. R3F asıl render'ı yapar; stub legacy main.js'in `sceneController.metrics.roomWidthM` gibi API çağrılarını kırmadan tutar.\n\n**I:** Bu shim **çift renderer çakışmasını önler**. Legacy scene.js (531 satır vanilla Three.js) artık çalışmıyor ama silinmedi; kod ölü kod olarak duruyor.\n\n**G:** `sceneController.setCamera('floor')` çağrısı şimdi `window.dispatchEvent('r3f:set-camera')` yayınlar — R3F SceneControls bunu dinler (Phase 2 deferred)."
+    },
+    {
+      "file": "main.js",
+      "line": 451,
+      "title": "5 · renderAll: State Senkron Kalbi",
+      "description": "**S:** `renderAll()` — legacy state değiştiğinde her şeyi yeniden render eden orkestratör.\n\n**M:** Sıra önemli:\n1. `stateManager.saveState()` — localStorage\n2. `simulation = runSimulation({ stateManager })` — hesap (calculation.js)\n3. DOM güncellemeleri: result panel, lists, charts\n4. `sceneController.renderLayouts(simulation)` — STUB (no-op)\n5. **`publishLegacyState()`** (satır 468) — R3F'e haber verir\n\n**I:** `publishLegacyState` her renderAll'da `window.__seramikcim` objesini günceller + `seramikcim:state` custom event fırlatır. R3F bunu `useSyncExternalStore` ile dinler.\n\n**G:** `publishLegacyState`'i çağırmayı unutursan 3D sahne stale data gösterir. Yeni state mutation yaparsan renderAll'ı tetiklemek zorunludur."
+    },
+    {
+      "directory": "src",
+      "title": "6 · Modern Frontend: src/ Mimarisi",
+      "description": "**S:** Modern katman üç parçalı:\n\n**M:**\n- `src/main.jsx` + `App.jsx` — React entry\n- `src/components/` — R3F bileşenleri (`Scene.jsx`, `Room.jsx`, `r3f/*.jsx` — Fixtures, Openings, TileRegions, MeshViewer)\n- `src/store/` — Zustand store + slices (geometry/inventory/surface/cad)\n- `src/threejs/builders.js` — pure helpers (deriveSceneData, makeWallSegments)\n- `src/hooks/useLegacyState.js` — window bridge subscriber\n- `src/theme.js`, `src/icons.js`, `src/toast.js`, `src/floatingPanels.js` — UI utility'leri\n\n**I:** Yeni React bileşeni yazarken `src/components/r3f/` veya `src/components/` altına koy. State okuma: `useAppStore((s) => s.geometry)` veya `useLegacyState()` (legacy data için).\n\n**G:** TileRegions/Fixtures/Openings legacy state'e bağımlı — useLegacyState kullanır. Yeni bağımsız bileşenler Zustand kullanmalı, bridge'i yenisi için tercih etme."
+    },
+    {
+      "file": "src/store/useAppStore.js",
+      "line": 22,
+      "title": "7 · Zustand Store + Slice'lar",
+      "description": "**S:** Zustand store 4 slice'tan oluşur: geometry / inventory / surface / cad.\n\n**M:** `persist` middleware ile localStorage'a yazar. `partialize` (satır 34) — sadece kalıcı olanlar: inventory, surfaceSettings, selectedSurfaceId, cadLayerVisibility, cadLineOverrides. Geometry ve catalog her yüklemede tazelenir.\n\n**I:** Yeni state ihtiyacı varsa: `src/store/slices/<name>Slice.js` oluştur, `useAppStore.js`'e `...createXxxSlice(set, get)` ekle. Hook export: `useXxx = () => useAppStore((s) => s.xxx)`.\n\n**G:** STORAGE_KEY `'seramikcim.inventory.sim.v1.zustand'` — legacy state.js'in key'i ile aynı **değil** (eski v1 vs yeni .zustand suffix). İki kaynak paralel; senkron `publishLegacyState` üzerinden."
+    },
+    {
+      "file": "src/App.jsx",
+      "line": 27,
+      "title": "8 · React Bootstrap: Geometri + Katalog Yükleme",
+      "description": "**S:** `App` mount olunca iki şey yapar: `loadGeometry()` + `loadCatalog()`.\n\n**M:** `loadGeometry` fetch zinciri:\n1. `/current_geometry.json` (pipeline çıktısı)\n2. `/banyo_geometry.json` (fallback)\n\nBaşarısızsa `geometryError` set edilir, App `toastError` ile bildirir. Geometri yüklenince `<Scene geometryData={geometry} />` mount edilir.\n\n**I:** Pipeline tetikleme (Hazırla butonu) `current_geometry.json`'ı yeniden yazar. App yeniden mount olmaz; geometri değişmedi diye yenilenmez. **Sayfa reload veya store.setGeometry() gerekir.**\n\n**G:** `MAX_FILE_SIZE_MB` env'den okunur — büyük JSON için performans uyarısı toast verir."
+    },
+    {
+      "file": "src/components/Scene.jsx",
+      "line": 20,
+      "title": "9 · R3F Sahne: Mesh vs CAD Mode",
+      "description": "**S:** `isMeshMode = geometry_mode === 'mesh'` — pipeline'ın hangi tarafı çalıştığını söyler.\n\n**M:** Mesh modunda `<MeshViewer>` (ham OBJ doğrudan render); CAD modunda `<Room>` (duvar segment kutuları). Her ikisinde de `<Fixtures>`, `<Openings>`, `<TileRegions>` üst üste eklenir (seramikler hesaba göre).\n\n**I:** Yeni 3D render katmanı eklerken bu mantığı düşün: \"hem mesh hem CAD'de mi çalışacak?\". Çoğu render bileşeni Zustand `sceneData` + legacy `useFixtures/useOpenings` hook'larını kullanır.\n\n**G:** Mesh modunda Room.jsx **render edilmez** — eski 'kabuk' yaklaşımı kaldırıldı. Mesh için ham OBJ tek doğru görünüm."
+    },
+    {
+      "file": "prepare_simulation.py",
+      "line": 55,
+      "title": "10 · Pipeline Orkestratörü: detect_format",
+      "description": "**S:** `detect_format(path)` dosya uzantısına göre işlem akışını seçer.\n\n**M:** Dönüş değerleri:\n- `.dwg/.dxf` → `'cad'` → [dxf_to_3d.process](dxf_to_3d.py)\n- `.obj` → `'mesh'` → [mesh_to_3d.process](mesh_to_3d.py)\n- `.skp` → `'skp_unsupported'` → SystemExit (manuel OBJ export rehberi)\n- Diğer → `'unknown'`\n\nAna giriş [`prepare()` (satır 713)](prepare_simulation.py#L713) bu dispatch'i kullanır. Mesh dosyaları için ayrı yol [`_prepare_mesh` (satır 629)](prepare_simulation.py#L629).\n\n**I:** Yeni format eklemek istersen burası: detect_format'a uzantıyı ekle + ayrı `_prepare_xxx` fonksiyon yaz. Çıktı her zaman aynı kontrat: `current_geometry.json` + `current_building.json`.\n\n**G:** DWG → DXF dönüşümü [convert_dwg_to_dxf (satır 253)](prepare_simulation.py#L253) — LibreDWG → ODA → aspose-cad sırası. En az biri kurulu olmalı."
+    },
+    {
+      "file": "mesh_to_3d.py",
+      "line": 137,
+      "title": "11 · OBJ Pipeline: Section-Based Wall Detection",
+      "description": "**S:** `extract_outline_via_section` — OBJ pipeline'ın kalbi. Mesh'i belirli yükseklikte yatay düzlemle kesip oda outline'ı çıkarır.\n\n**M:** Akış:\n1. [`normalize_mesh` (satır 121)](mesh_to_3d.py#L121) — X-Z merkezle, Y=0 zemine\n2. `trimesh.section(plane_origin=[0, base_y + 1.3, 0], plane_normal=[0,1,0])` — Path3D\n3. `section.discrete` — 3D vertex chain'ler (X-Z world coord)\n4. Her chain → Shapely Polygon\n5. En büyük 3 chain → `unary_union` → dış kontur\n6. `simplify(0.02)` — noise eler\n\n**I:** Önceki yaklaşım (`group_coplanar_faces`) Banyo.obj için 21 sahte duvar üretiyordu. Section-based **mesh topolojisi** kullanır → 8 gerçek duvar.\n\n**G:** Section yüksekliği 1.3m'de mesh kapanmıyorsa [`extract_outline_with_fallback` (satır 197)](mesh_to_3d.py#L197) 1.0m → 0.5m dener. Açık-plan modellerde yine başarısız olabilir."
+    },
+    {
+      "file": "api/main.py",
+      "line": 34,
+      "title": "12 · FastAPI: Katalog Endpoint'leri",
+      "description": "**S:** Bağımsız FastAPI sunucusu — sadece katalog CRUD.\n\n**M:** Endpoint'ler:\n- `GET /api/catalog` — liste + filter (?q=, ?type=, ?surface=)\n- `GET /api/catalog/{id}` — tek ürün\n- `POST/PUT/DELETE` — CRUD\n- `GET /api/health` — status\n\nStorage: [api/storage.py](api/storage.py) — public/catalog.json'a atomic write (in-memory cache).\n\n**I:** Vite proxy `/api/catalog` ve `/api/health` FastAPI'ye yönlendirir; `/api/cad-files` ve `/api/prepare-simulation` Vite custom middleware'inde kalır (`vite.config.js`).\n\n**G:** CORS sadece `localhost:5173/5174` — internet expose için env-driven CORS gerekir (NEXT_PHASE_PLAN Phase 5)."
+    },
+    {
+      "directory": "tests",
+      "title": "13 · Test Altyapısı — 252 Test",
+      "description": "**S:** İki test runner: vitest (115 JS test) + pytest (137 Python test).\n\n**M:** Komutlar:\n- `npm run test` — vitest\n- `npm run test:py` — pytest\n- `npm run test:all` — ikisi\n- `npm run test:ci` — build + test:all\n\nFixture'lar `tests/conftest.py`'de (programatik DXF/OBJ üretimi). Demo veri `ornekler/test_a.dwg` + `Obj/Banyo.obj`.\n\n**I:** Yeni özellik için: spec dosyası `tests/<feature>.test.js` (vitest) veya `tests/test_<feature>.py` (pytest). Pattern referansı: [tests/test_mesh_to_3d.py](../tests/test_mesh_to_3d.py).\n\n**G:** E2E (Playwright) henüz yok — NEXT_PHASE_PLAN Phase 2'de. Manuel demo doğrulama için DEMO_GUIDE.md."
+    },
+    {
+      "title": "14 · Şimdi Ne Yapabilirsin",
+      "description": "**Tebrikler — Seramikcim mimarisini biliyorsun.**\n\n## Yeni özellik eklerken hangi dosyaya gidersin\n\n| Yapacağın iş | Dokunulacak dosya(lar) |\n|---|---|\n| Yeni 3D bileşen | `src/components/r3f/*.jsx` + Scene.jsx'e ekle |\n| Yeni state alanı | `src/store/slices/<name>Slice.js` + `useAppStore.js` |\n| Yeni format desteği (.stl, vs.) | `prepare_simulation.detect_format` + yeni `<format>_to_3d.py` |\n| Yeni katalog endpoint | `api/main.py` + `api/models.py` |\n| Yeni hesap fonksiyonu | `src/modules/calculator.js` (pure) |\n| Yeni UI paneli | `index.html` + `main.js` event bind + `state.js` + `floatingPanels.registerPanel` |\n| Yeni test | `tests/<name>.test.js` veya `tests/test_<name>.py` |\n\n## Önemli kaynaklar\n\n- **README.md** — kurulum + scenario tablosu\n- **DEMO_GUIDE.md** — 5-15 dk demo akışı + fail prosedürü\n- **KNOWN_LIMITATIONS.md** — neyi vaat etmemek\n- **TEST_REPORT.md** — 252 test detayı\n- **NEXT_PHASE_PLAN.md** — 5 kontrollü gelecek faz\n- **CUSTOMER_HANDOFF.md** — müşteri-safe özet\n\n## Sonraki adım önerisi\n\nİlk hands-on iş: `npm run dev` → tarayıcıda `http://localhost:5173/` → Hazırla → `ornekler/test_a.dwg` → 3D sahnede 5.80 m² oda gör. Sonra `Obj/Banyo.obj` ile mesh akışını izle.\n\nKod-okuma için Phase 2 (E2E) veya Phase 1 (Opening detection) NEXT_PHASE_PLAN'da bekliyor."
+    }
+  ]
+}
