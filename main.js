@@ -994,7 +994,7 @@ try {
 try {
   registerPanel({
     id: 'commerce',
-    el: document.querySelector('.commerce-drawer'),
+    el: document.querySelector('#commerce-drawer'),
     defaults: { center: true, width: 900, height: 750 },
     dragHandle: '.floating-drawer__header',
     floating: true,

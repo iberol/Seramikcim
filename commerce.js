@@ -14,14 +14,17 @@ export function createCommerceController({ dom, stateManager, getSimulation, ren
   function open(tab = stateManager.state.ui.activeCommerceTab || 'store') {
     stateManager.state.ui.commerceDrawerOpen = true;
     stateManager.state.ui.activeCommerceTab = tab;
-    drawer.classList.remove('hidden');
+    // Panel CSS'i .floating-drawer.d-none { display:none } ile gizleniyor → d-none kaldır.
+    // panel-minimized (floatingPanels'ın eski kalıntı durumu) açılışta temizlenir.
+    drawer.classList.remove('d-none', 'hidden', 'panel-minimized');
     document.body.classList.add('commerce-open');
     render();
   }
 
   function close() {
     stateManager.state.ui.commerceDrawerOpen = false;
-    drawer.classList.add('hidden');
+    drawer.classList.add('d-none');
+    drawer.classList.remove('hidden');
     document.body.classList.remove('commerce-open');
     stateManager.saveState();
   }
@@ -250,9 +253,14 @@ export function createCommerceController({ dom, stateManager, getSimulation, ren
     drawer.querySelectorAll('[data-commerce-tab]').forEach((button) => {
       button.classList.toggle('active', button.dataset.commerceTab === stateManager.state.ui.activeCommerceTab);
     });
-    dom.commerceStorePage.classList.toggle('active', stateManager.state.ui.activeCommerceTab === 'store');
-    dom.commerceInventoryPage.classList.toggle('active', stateManager.state.ui.activeCommerceTab === 'inventory');
-    dom.commerceDetailPage.classList.toggle('active', stateManager.state.ui.activeCommerceTab === 'detail');
+    const tab = stateManager.state.ui.activeCommerceTab;
+    dom.commerceStorePage.classList.toggle('active', tab === 'store');
+    dom.commerceInventoryPage.classList.toggle('active', tab === 'inventory');
+    dom.commerceDetailPage.classList.toggle('active', tab === 'detail');
+    // Sayfa görünürlüğü d-none ile kontrol ediliyor (.active'in CSS karşılığı yok)
+    dom.commerceStorePage.classList.toggle('d-none', tab !== 'store');
+    dom.commerceInventoryPage.classList.toggle('d-none', tab !== 'inventory');
+    dom.commerceDetailPage.classList.toggle('d-none', tab !== 'detail');
   }
 
   function render() {
@@ -260,7 +268,8 @@ export function createCommerceController({ dom, stateManager, getSimulation, ren
     renderStore();
     renderInventory();
     renderDetail();
-    drawer.classList.toggle('hidden', !stateManager.state.ui.commerceDrawerOpen);
+    drawer.classList.toggle('d-none', !stateManager.state.ui.commerceDrawerOpen);
+    if (!stateManager.state.ui.commerceDrawerOpen) drawer.classList.remove('panel-minimized');
     document.body.classList.toggle('commerce-open', stateManager.state.ui.commerceDrawerOpen);
   }
 
