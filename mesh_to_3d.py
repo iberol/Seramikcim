@@ -67,6 +67,11 @@ MIN_VERTICES = 8
 MIN_WALL_AREA_M2 = 0.50       # bir duvar yüzeyi olmak için min toplam alan
 MIN_FLOOR_AREA_M2 = 0.80      # zemin/tavan adayı için min alan
 
+# Doğrulanmış Z-up demo modelleri (tarayıcıda görsel onaylı). Bunlar env bayrağı
+# olmadan da Y↔Z swap edilir; diğer modeller (cube,5,banyo,egri) Y-up'tır.
+# MESH_SWAP_YZ env'i bu listeyi geçersiz kılar (her model için elle 1/0).
+Z_UP_MODELS = {"1", "2", "3", "4"}
+
 
 # ── Yükleme & validation ──────────────────────────────────────────────────────
 
@@ -1954,6 +1959,24 @@ def process(obj_path: str) -> Optional[dict]:
     print(f"[Validation] watertight={validation['is_watertight']}  "
           f"winding={validation['is_winding_consistent']}  "
           f"warnings={validation['warnings']}")
+
+    # Eksen düzeltme: bazı mimari CAD/OBJ ihracı Z-up'tır; pipeline Y-up varsayar.
+    # Doğrulanmış Z-up demo modelleri (Z_UP_MODELS) env bayrağı olmadan da otomatik
+    # swap edilir; cube/5/banyo/egri Y-up olduğundan dokunulmaz. MESH_SWAP_YZ env'i
+    # her modeli elle zorlar/iptal eder (kullanıcının kendi Z-up CAD'i için =1).
+    # Otomatik genel tespit güvenilmediğinden (8/4) açık liste tercih edildi.
+    _base = Path(obj_path).stem.lower()
+    _env = os.environ.get("MESH_SWAP_YZ")  # "1" | "0" | None
+    do_swap = (_env == "1") if _env is not None else (_base in Z_UP_MODELS)
+    if do_swap:
+        # Y ile Z yer değiştir (X etrafında -90°, proper rotation, mirror DEĞİL):
+        # (x,y,z) → (x, z, -y). Eski Z (CAD'de yukarı) yeni Y (sahnede yukarı) olur.
+        T = np.array([[1, 0, 0, 0],
+                      [0, 0, 1, 0],
+                      [0, -1, 0, 0],
+                      [0, 0, 0, 1]], dtype=float)
+        mesh.apply_transform(T)
+        print(f"[Eksen] Y↔Z swap uygulandı (base={_base}, env={_env})")
 
     _, offset = normalize_mesh(mesh)
     print(f"[Normalize] offset={[round(float(o), 3) for o in offset]}  "
