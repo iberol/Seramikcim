@@ -870,15 +870,16 @@ function printReport() {
     const tileEntries = entries.filter((e) => e.product?.type === 'tile');
     const otherEntries = entries.filter((e) => e.product?.type !== 'tile');
 
-    // Alan dağılımı (zemin vs duvar)
+    // Alan dağılımı (zemin vs duvar) — byProduct.entry.regions[].{region,result}
     let floorArea = 0;
     let wallArea = 0;
-    if (simulation?.byRegion) {
-      Object.values(simulation.byRegion).forEach((r) => {
-        if (r.region?.id === 'floor') floorArea += Number(r.area || 0);
-        else wallArea += Number(r.area || 0);
+    entries.forEach((e) => {
+      (e.regions || []).forEach(({ region, result }) => {
+        const kind = region.kind;
+        if (kind === 'wall' || kind === 'curved') wallArea += Number(result?.area || 0);
+        else floorArea += Number(result?.area || 0);
       });
-    }
+    });
     const totalArea = Number(simulation?.totalArea || 0);
     const wastePct = stateManager?.state?.settings?.wastePct ?? 10;
 
@@ -951,7 +952,7 @@ function printReport() {
 
       <div class="inv-summary-row">
         <div class="inv-stat"><span>Toplam Alan</span><strong>${fmt(totalArea)} m²</strong></div>
-        <div class="inv-stat"><span>Zemin</span><strong>${fmt(floorArea > 0 ? floorArea : totalArea)} m²</strong></div>
+        <div class="inv-stat"><span>Zemin</span><strong>${fmt(floorArea)} m²</strong></div>
         <div class="inv-stat"><span>Duvar</span><strong>${fmt(wallArea)} m²</strong></div>
         <div class="inv-stat"><span>m² Birim Maliyet</span><strong>${formatCurrency(perSqm)}</strong></div>
         <div class="inv-stat"><span>Toplam Kesim</span><strong>${totalCuts} adet</strong></div>
