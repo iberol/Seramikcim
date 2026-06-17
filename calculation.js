@@ -30,13 +30,10 @@ export function runSimulation({ stateManager }) {
     full += result.full;
     cutPieces = cutPieces.concat(result.cutPieces);
     cutTiles = cutTiles.concat(result.cutTiles.map((bin) => ({ ...bin, productId: tile.id, region: region.name })));
-    // Alan-bazlı required (kullanıcı beklentisi ile uyumlu)
-    const grout = settings.groutMm / 1000;
-    const effW = (Number(tile.width_m) || 0) + grout;
-    const effH = (Number(tile.height_m) || 0) + grout;
-    const effArea = effW * effH;
-    const areaRequired = effArea > 0 ? Math.ceil(result.area / effArea) : result.required;
-    required += areaRequired;
+    // PARÇA-bazlı adet: kesik birleştirme yasak → her kesik 1 tam karo.
+    // pieceCount = tam karo + kesik sayısı (artıklar fire, yeniden kullanılmaz).
+    const pieceCount = result.full + result.cutPieces.length;
+    required += pieceCount;
     const entry = byProduct.get(tile.id) || {
       product: tile,
       area: 0,
@@ -50,17 +47,16 @@ export function runSimulation({ stateManager }) {
     entry.area += result.area;
     entry.full += result.full;
     entry.cuts += result.cutPieces.length;
-    entry.required += areaRequired;
-    // Alan-bazlı fire: order = ceil(alan × (1+fire%) / karo_alanı)
-    entry.order = effArea > 0
-      ? Math.ceil(entry.area * (1 + settings.wastePct / 100) / effArea)
-      : Math.ceil(entry.required * (1 + settings.wastePct / 100));
-    // Kutu hesabı: catalog sqm_per_box değeri varsa kullan
+    entry.required += pieceCount;
+    // Fire% breakage payı olarak (tam+kesik) sayısının üstüne eklenir.
+    entry.order = Math.ceil((entry.full + entry.cuts) * (1 + settings.wastePct / 100));
+    // Kutu hesabı PARÇA-bazlı: pieces_per_box (yoksa sqm_per_box/karo_alanı'ndan türet).
+    const tileArea = (Number(tile.width_m) || 0) * (Number(tile.height_m) || 0);
     const sqmPerBox = Number(tile.sqm_per_box) || 0;
-    const piecesPerBox = Math.max(1, Number(tile.pieces_per_box) || 1);
-    entry.orderBoxes = sqmPerBox > 0
-      ? Math.ceil(entry.area * (1 + settings.wastePct / 100) / sqmPerBox)
-      : Math.ceil(entry.order / piecesPerBox);
+    let piecesPerBox = Math.max(0, Number(tile.pieces_per_box) || 0);
+    if (!piecesPerBox && sqmPerBox > 0 && tileArea > 0) piecesPerBox = Math.round(sqmPerBox / tileArea);
+    piecesPerBox = Math.max(1, piecesPerBox);
+    entry.orderBoxes = Math.ceil(entry.order / piecesPerBox);
     entry.regions.push({ region, result });
     byProduct.set(tile.id, entry);
     stateManager.ensureInventory(tile.id, region.name, {
@@ -73,15 +69,15 @@ export function runSimulation({ stateManager }) {
   let order = 0;
   byProduct.forEach((entry) => { order += entry.order; });
   if (order === 0) order = Math.ceil(required * (1 + settings.wastePct / 100));
-  const reusable = cutTiles.flatMap((bin, index) => bin.free.map((free) => ({ ...free, bin: index + 1, productId: bin.productId })));
-  const suggestions = reusable
-    .map((free) => {
-      const match = cutPieces.find((piece) => piece.productId === free.productId && piece.w <= free.w + 0.001 && piece.h <= free.h + 0.001);
-      return match
-        ? `${cm(free.w)}x${cm(free.h)} artik, ${match.region} icin kullanilabilir`
-        : `${cm(free.w)}x${cm(free.h)} artik kullanim disi`;
-    })
-    .slice(0, 12);
+  // Kesik birleştirme YASAK → artıklar fire (yeniden kullanılmaz). Öneri yerine
+  // her kesik karonun artık ölçüsünü FİRE olarak raporla.
+  const suggestions = [];
+  if (cutPieces.length) {
+    suggestions.push(`${cutPieces.length} kesik karo · artıklar birleştirilmez (fire)`);
+    cutPieces.slice(0, 11).forEach((piece) => {
+      suggestions.push(`${cm(piece.w)}x${cm(piece.h)} kesim → kalan artık fire`);
+    });
+  }
 
   return { regions, byProduct, totalArea, full, cutPieces, cutTiles, required, order, suggestions };
 }
@@ -139,37 +135,21 @@ function simulateRect(rect, tile, settings) {
   };
 }
 
+/**
+ * packCutPieces — KESİK BİRLEŞTİRME YASAK.
+ * Her kesik parça KENDİ tam karosundan çıkar; artık başka bir kesim için
+ * kullanılmaz (free: [] → yeniden kullanım yok, artık = fire). Böylece
+ * cutTiles.length === cutPieces.length olur ve adet gerçekçi sayılır.
+ */
 function packCutPieces(pieces, tileW, tileH) {
-  const bins = [];
-  const sorted = [...pieces].sort((a, b) => b.w * b.h - a.w * a.h);
-  sorted.forEach((piece) => {
-    let placed = false;
-    for (const bin of bins) {
-      const slotIndex = bin.free.findIndex((slot) => piece.w <= slot.w + 0.001 && piece.h <= slot.h + 0.001);
-      if (slotIndex >= 0) {
-        const slot = bin.free.splice(slotIndex, 1)[0];
-        bin.pieces.push(piece);
-        const right = { w: slot.w - piece.w, h: piece.h };
-        const bottom = { w: slot.w, h: slot.h - piece.h };
-        if (right.w > 0.02 && right.h > 0.02) bin.free.push(right);
-        if (bottom.w > 0.02 && bottom.h > 0.02) bin.free.push(bottom);
-        placed = true;
-        break;
-      }
-    }
-    if (!placed) {
-      bins.push({
-        w: tileW,
-        h: tileH,
-        pieces: [piece],
-        free: [
-          { w: tileW - piece.w, h: piece.h },
-          { w: tileW, h: tileH - piece.h },
-        ].filter((slot) => slot.w > 0.02 && slot.h > 0.02),
-      });
-    }
-  });
-  return bins;
+  const tileArea = tileW * tileH;
+  return pieces.map((piece) => ({
+    w: tileW,
+    h: tileH,
+    pieces: [piece],
+    free: [], // artık yeniden kullanılmaz
+    waste: Math.max(0, tileArea - (piece.w * piece.h)),
+  }));
 }
 
 // ── Phase B: Wireframe-driven surface modeli ──────────────────────────────────
