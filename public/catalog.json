@@ -11,7 +11,27 @@
       "surface": "mat",
       "pieces_per_box": 16,
       "sqm_per_box": 1.44,
-      "price": 420
+      "price": 420,
+      "variants": [
+        {
+          "id": "tile-60-bianco",
+          "sku": "SRM-6060-BIA",
+          "width_m": 0.6,
+          "height_m": 0.6,
+          "pieces_per_box": 4,
+          "sqm_per_box": 1.44,
+          "price": 680
+        },
+        {
+          "id": "tile-30x60-bianco",
+          "sku": "SRM-3060-BIA",
+          "width_m": 0.3,
+          "height_m": 0.6,
+          "pieces_per_box": 8,
+          "sqm_per_box": 1.44,
+          "price": 520
+        }
+      ]
     },
     {
       "id": "tile-60-greige",
@@ -24,7 +44,27 @@
       "surface": "mat",
       "pieces_per_box": 4,
       "sqm_per_box": 1.44,
-      "price": 690
+      "price": 690,
+      "variants": [
+        {
+          "id": "tile-30-greige",
+          "sku": "SRM-3030-GRG",
+          "width_m": 0.3,
+          "height_m": 0.3,
+          "pieces_per_box": 16,
+          "sqm_per_box": 1.44,
+          "price": 480
+        },
+        {
+          "id": "tile-30x60-greige",
+          "sku": "SRM-3060-GRG",
+          "width_m": 0.3,
+          "height_m": 0.6,
+          "pieces_per_box": 8,
+          "sqm_per_box": 1.44,
+          "price": 580
+        }
+      ]
     },
     {
       "id": "tile-40x80-sage",
@@ -37,7 +77,27 @@
       "surface": "saten",
       "pieces_per_box": 5,
       "sqm_per_box": 1.6,
-      "price": 760
+      "price": 760,
+      "variants": [
+        {
+          "id": "tile-20x40-sage",
+          "sku": "SRM-2040-SAG",
+          "width_m": 0.2,
+          "height_m": 0.4,
+          "pieces_per_box": 20,
+          "sqm_per_box": 1.6,
+          "price": 560
+        },
+        {
+          "id": "tile-60x120-sage",
+          "sku": "SRM-60120-SAG",
+          "width_m": 0.6,
+          "height_m": 1.2,
+          "pieces_per_box": 2,
+          "sqm_per_box": 1.44,
+          "price": 980
+        }
+      ]
     },
     {
       "id": "tile-60x120-calacatta",
@@ -50,7 +110,27 @@
       "surface": "parlak",
       "pieces_per_box": 2,
       "sqm_per_box": 1.44,
-      "price": 980
+      "price": 980,
+      "variants": [
+        {
+          "id": "tile-60-calacatta",
+          "sku": "SRM-6060-CAL",
+          "width_m": 0.6,
+          "height_m": 0.6,
+          "pieces_per_box": 4,
+          "sqm_per_box": 1.44,
+          "price": 780
+        },
+        {
+          "id": "tile-30x60-calacatta",
+          "sku": "SRM-3060-CAL",
+          "width_m": 0.3,
+          "height_m": 0.6,
+          "pieces_per_box": 8,
+          "sqm_per_box": 1.44,
+          "price": 620
+        }
+      ]
     },
     {
       "id": "tile-10-mosaic-blue",
@@ -63,7 +143,27 @@
       "surface": "mat",
       "pieces_per_box": 100,
       "sqm_per_box": 1,
-      "price": 520
+      "price": 520,
+      "variants": [
+        {
+          "id": "tile-5-mosaic-blue",
+          "sku": "SRM-0505-BLU",
+          "width_m": 0.05,
+          "height_m": 0.05,
+          "pieces_per_box": 400,
+          "sqm_per_box": 1,
+          "price": 620
+        },
+        {
+          "id": "tile-20-mosaic-blue",
+          "sku": "SRM-2020-BLU",
+          "width_m": 0.2,
+          "height_m": 0.2,
+          "pieces_per_box": 25,
+          "sqm_per_box": 1,
+          "price": 480
+        }
+      ]
     },
     {
       "id": "fixture-sink-60",

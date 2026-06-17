@@ -11,6 +11,20 @@ import { escapeHtml } from './src/utils/escape.js';
 export function createCommerceController({ dom, stateManager, getSimulation, renderAll, onOpenCad }) {
   const drawer = dom.commerceDrawer;
 
+  // parentId → seçili varyant id (seçilmemişse parentId kendisi geçerlidir)
+  const selectedVariants = new Map();
+
+  function getResolvedProduct(parentId) {
+    const parent = stateManager.products.find((p) => p.id === parentId);
+    if (!parent) return null;
+    const variantId = selectedVariants.get(parentId);
+    if (!variantId || variantId === parentId) return parent;
+    const variant = (parent.variants || []).find((v) => v.id === variantId);
+    if (!variant) return parent;
+    // Kök + varyant override merge; varyant kendi id'sini kullanır
+    return { ...parent, ...variant, _parentId: parentId };
+  }
+
   function open(tab = stateManager.state.ui.activeCommerceTab || 'store') {
     stateManager.state.ui.commerceDrawerOpen = true;
     stateManager.state.ui.activeCommerceTab = tab;
@@ -87,9 +101,12 @@ export function createCommerceController({ dom, stateManager, getSimulation, ren
   }
 
   function handleProductAction(productId, action) {
-    if (action === 'default-tile') stateManager.setDefaultTile(productId, 'Ana kaplama');
-    if (action === 'inventory-add') stateManager.addInventoryProduct(productId, 'Envanter');
-    if (action === 'prepare-placement') stateManager.preparePlacement(productId);
+    // parentId alabilir; seçili varyant varsa onu kullan
+    const resolved = getResolvedProduct(productId);
+    const resolvedId = resolved?.id || productId;
+    if (action === 'default-tile') stateManager.setDefaultTile(resolvedId, 'Ana kaplama');
+    if (action === 'inventory-add') stateManager.addInventoryProduct(resolvedId, 'Envanter');
+    if (action === 'prepare-placement') stateManager.preparePlacement(resolvedId);
     stateManager.saveState();
     renderAll();
   }
@@ -103,20 +120,31 @@ export function createCommerceController({ dom, stateManager, getSimulation, ren
     );
 
     dom.commerceStoreList.innerHTML = filtered.map((product) => {
+      const resolved = getResolvedProduct(product.id);
       const row = stateManager.getProductRow(product.id, simulation);
+      const variants = product.variants || [];
+      const activeVariantId = selectedVariants.get(product.id) || product.id;
+      const variantChips = variants.length > 0
+        ? `<div class="product-variants">
+            <button class="variant-chip${activeVariantId === product.id ? ' active' : ''}" data-variant-parent="${product.id}" data-variant-id="${product.id}">${escapeHtml(formatProductSize(product))}</button>
+            ${variants.map((v) => `<button class="variant-chip${activeVariantId === v.id ? ' active' : ''}" data-variant-parent="${product.id}" data-variant-id="${v.id}">${escapeHtml(formatProductSize(v))}</button>`).join('')}
+          </div>`
+        : '';
       return `
         <article class="commerce-card${stateManager.state.ui.selectedProductId === product.id ? ' active' : ''}">
           <button class="commerce-card-main" data-product-detail="${product.id}">
             <span class="swatch" style="background:${product.color || '#888'}"></span>
             <span class="commerce-card-copy">
               <strong>${escapeHtml(product.name)}</strong>
-              <small>${escapeHtml(product.sku || '')} • ${escapeHtml(formatProductType(product))}</small>
-              <small>${escapeHtml(formatProductSize(product))}${product.sqm_per_box ? ` • ${escapeHtml(String(product.sqm_per_box))} m2/kutu` : ''}</small>
+              <small class="product-size">${escapeHtml(formatProductSize(resolved))}</small>
+              <small>${escapeHtml(resolved.sku || '')} • ${escapeHtml(formatProductType(product))}</small>
+              <small>${resolved.sqm_per_box ? `${escapeHtml(String(resolved.sqm_per_box))} m2/kutu` : ''}${product.surface ? ` • ${escapeHtml(product.surface)}` : ''}</small>
               <small>${escapeHtml(getProductUsageLabel(product))}</small>
             </span>
           </button>
+          ${variantChips}
           <div class="commerce-card-meta">
-            <span>${formatCurrency(product.price)}</span>
+            <span>${formatCurrency(resolved.price)}</span>
             <span>${row ? `${row.required || row.entry.quantity} ihtiyac` : 'Katalog urunu'}</span>
           </div>
           <div class="commerce-card-actions">
@@ -128,6 +156,13 @@ export function createCommerceController({ dom, stateManager, getSimulation, ren
       `;
     }).join('') || '<p class="muted">Filtrelere uygun urun bulunamadi.</p>';
 
+    drawer.querySelectorAll('[data-variant-parent]').forEach((button) => button.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const parentId = button.dataset.variantParent;
+      const variantId = button.dataset.variantId;
+      selectedVariants.set(parentId, variantId);
+      render();
+    }));
     drawer.querySelectorAll('[data-product-detail]').forEach((button) => button.addEventListener('click', () => {
       openDetail(button.dataset.productDetail, 'store');
     }));

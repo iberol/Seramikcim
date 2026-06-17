@@ -3,7 +3,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { escapeHtml } from './src/utils/escape.js';
 import fallbackGeometryData from './banyo_geometry.json';
 import fallbackBuildingData from './banyo_building.json';
-import { createStateManager, fmt, cm, formatCurrency } from './state.js';
+import { createStateManager, fmt, cm, formatCurrency, formatProductSize } from './state.js';
 import { runSimulation } from './calculation.js';
 import { createSceneController, deriveSceneData } from './scene-stub.js';
 import { initTheme, mountThemeToggle } from './src/theme.js';
@@ -125,9 +125,19 @@ let {
 } = await loadSelectedModel(requestedModelId);
 const catalogResult = await loadJsonResult('/catalog.json', { products: [] });
 const catalog = catalogResult.data;
-const products = catalog.products || [];
-const tileProducts = products.filter((product) => product.type === 'tile');
-const fixtureProducts = products.filter((product) => product.type === 'fixture' || product.type === 'accessory');
+const baseProducts = catalog.products || [];
+// Varyantları flat listeye ekle (_parentId ile işaretli) → productById varyant ID'yi de bulur
+const products = [];
+for (const p of baseProducts) {
+  products.push(p);
+  if (Array.isArray(p.variants)) {
+    for (const v of p.variants) {
+      products.push({ ...p, ...v, _parentId: p.id, variants: undefined });
+    }
+  }
+}
+const tileProducts = products.filter((product) => product.type === 'tile' && !product._parentId);
+const fixtureProducts = products.filter((product) => (product.type === 'fixture' || product.type === 'accessory') && !product._parentId);
 const runtimeWarnings = [
   ...(dataLoadWarnings || []),
   catalogResult.fallbackUsed ? `Urun katalogu okunamadi (${catalogResult.reason || catalogResult.url}); magaza bos acilacak.` : null,
@@ -590,8 +600,8 @@ function renderControls() {
   const selectableFixtures = stateManager.getSelectableFixtures();
 
   if(dom.wallSelect) dom.wallSelect.innerHTML = sceneData.walls.map((wall) => `<option value="${wall.id}">${wall.name}</option>`).join('');
-  if(dom.defaultTileSelect) dom.defaultTileSelect.innerHTML = selectableTiles.map((tile) => `<option value="${tile.id}">${tile.name}</option>`).join('');
-  if(dom.regionTileSelect) dom.regionTileSelect.innerHTML = selectableTiles.map((tile) => `<option value="${tile.id}">${tile.name}</option>`).join('');
+  if(dom.defaultTileSelect) dom.defaultTileSelect.innerHTML = selectableTiles.map((tile) => `<option value="${tile.id}">${tile.name} — ${formatProductSize(tile)}</option>`).join('');
+  if(dom.regionTileSelect) dom.regionTileSelect.innerHTML = selectableTiles.map((tile) => `<option value="${tile.id}">${tile.name} — ${formatProductSize(tile)}</option>`).join('');
   if(dom.groutSelect) dom.groutSelect.innerHTML = GROUT_OPTIONS.map((mm) => `<option value="${mm}">${mm} mm</option>`).join('');
   if(dom.fixtureSelect) dom.fixtureSelect.innerHTML = selectableFixtures.map((product) => `<option value="${product.id}">${product.name}</option>`).join('');
 
@@ -611,7 +621,7 @@ function renderSharedInventorySummary() {
   if (!dom.reportInventoryList) return;
   dom.reportInventoryList.innerHTML = rows.map((row) => `
     <div class="mb-2 pb-2 border-bottom">
-      <strong class="d-block">${row.product.name}</strong>
+      <strong class="d-block">${row.product.name}<span class="product-size ms-1">${formatProductSize(row.product)}</span></strong>
       <span class="d-block">${row.product.type === 'tile' ? `${row.orderQuantity} adet (fireli) / ${row.orderBoxes} kutu` : `${row.entry.quantity} adet`}</span>
       <small class="d-block text-muted">${row.usageContexts.join(', ') || row.usageLabel}</small>
       <small class="d-block text-success fw-bold">${formatCurrency(row.estimatedCost)}</small>
@@ -676,7 +686,7 @@ function renderResults() {
 
   // Bar chart grafikleri
   if (dom.productChart) {
-    renderBarChart(dom.productChart, [...simulation.byProduct.values()].map((entry) => ({ label: escapeHtml(entry.product.name), value: entry.required })));
+    renderBarChart(dom.productChart, [...simulation.byProduct.values()].map((entry) => ({ label: `${escapeHtml(entry.product.name)} ${formatProductSize(entry.product)}`, value: entry.required })));
   }
 
   renderSharedInventorySummary();
@@ -847,25 +857,141 @@ function printReport() {
   const header = document.getElementById('report-print-header');
   if (header) {
     const modelLabel = formatModelLabel(activeModelId);
-    const src = sceneData?.meta?.source || '';
-    const dateStr = new Date().toLocaleDateString('tr-TR');
-    const area = simulation ? Number(simulation.totalArea || 0) : 0;
-    const order = simulation ? Number(simulation.order || 0) : 0;
-    let boxes = 0;
-    if (simulation?.byProduct) {
-      const entries = simulation.byProduct instanceof Map
-        ? Array.from(simulation.byProduct.values())
-        : Object.values(simulation.byProduct);
-      entries.forEach((e) => { boxes += Number(e.orderBoxes || 0); });
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('tr-TR');
+    const docNo = `SRM-${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}-${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
+
+    const entries = simulation?.byProduct
+      ? (simulation.byProduct instanceof Map
+          ? Array.from(simulation.byProduct.values())
+          : Object.values(simulation.byProduct))
+      : [];
+
+    const tileEntries = entries.filter((e) => e.product?.type === 'tile');
+    const otherEntries = entries.filter((e) => e.product?.type !== 'tile');
+
+    // Alan dağılımı (zemin vs duvar)
+    let floorArea = 0;
+    let wallArea = 0;
+    if (simulation?.byRegion) {
+      Object.values(simulation.byRegion).forEach((r) => {
+        if (r.region?.id === 'floor') floorArea += Number(r.area || 0);
+        else wallArea += Number(r.area || 0);
+      });
     }
+    const totalArea = Number(simulation?.totalArea || 0);
+    const wastePct = stateManager?.state?.settings?.wastePct ?? 10;
+
+    // Fatura toplamları
+    let subtotal = 0;
+    tileEntries.forEach((e) => {
+      const unitPrice = Number(e.product?.price || 0);
+      subtotal += unitPrice * Number(e.orderBoxes || 0) * Number(e.product?.sqm_per_box || 1);
+    });
+    otherEntries.forEach((e) => {
+      subtotal += Number(e.product?.price || 0) * Number(e.entry?.quantity || 0);
+    });
+    const vat = subtotal * 0.20;
+    const grandTotal = subtotal + vat;
+    const perSqm = totalArea > 0 ? subtotal / totalArea : 0;
+
+    const totalCuts = entries.reduce((s, e) => s + Number(e.cuts || 0), 0);
+
+    function rowHtml(i, entry) {
+      const p = entry.product;
+      const unitPrice = Number(p?.price || 0);
+      const boxes = Number(entry.orderBoxes || 0);
+      const sqmPerBox = Number(p?.sqm_per_box || 1);
+      const lineCost = unitPrice * boxes * sqmPerBox;
+      return `<tr>
+        <td>${i}</td>
+        <td>${escapeHtml(p?.name || '-')}<br><small class="inv-sku">${escapeHtml(p?.sku || '')}</small></td>
+        <td>${escapeHtml(formatProductSize(p))}</td>
+        <td>${fmt(Number(entry.area || 0))}</td>
+        <td>${(Number(entry.required || 0)).toLocaleString('tr-TR')}</td>
+        <td>${(Number(entry.order || 0)).toLocaleString('tr-TR')}</td>
+        <td>${boxes}</td>
+        <td>${formatCurrency(unitPrice)}/m²</td>
+        <td>${formatCurrency(lineCost)}</td>
+      </tr>`;
+    }
+
+    function fixtureRowHtml(i, entry) {
+      const p = entry.product;
+      const qty = Number(entry.entry?.quantity || 0);
+      const lineCost = Number(p?.price || 0) * qty;
+      return `<tr>
+        <td>${i}</td>
+        <td>${escapeHtml(p?.name || '-')}<br><small class="inv-sku">${escapeHtml(p?.sku || '')}</small></td>
+        <td>${escapeHtml(formatProductSize(p))}</td>
+        <td>—</td>
+        <td>${qty}</td>
+        <td>${qty}</td>
+        <td>—</td>
+        <td>${formatCurrency(p?.price || 0)}/adet</td>
+        <td>${formatCurrency(lineCost)}</td>
+      </tr>`;
+    }
+
     header.innerHTML = `
-      <h2 class="report-print-title">Seramikcim — Kaplama Raporu</h2>
-      <div class="report-print-meta">
-        <span>Model: ${escapeHtml(modelLabel)}${src ? ' · ' + escapeHtml(src) : ''}</span>
-        <span>Tarih: ${escapeHtml(dateStr)}</span>
+      <div class="inv-header">
+        <div class="inv-brand">
+          <span class="inv-logo">Seramikcim</span>
+          <span class="inv-tagline">Kaplama Metraj &amp; Sipariş Sistemi</span>
+        </div>
+        <div class="inv-meta-box">
+          <table><tbody>
+            <tr><td>Model</td><td>${escapeHtml(modelLabel)}</td></tr>
+            <tr><td>Tarih</td><td>${escapeHtml(dateStr)}</td></tr>
+            <tr><td>Belge No</td><td>${escapeHtml(docNo)}</td></tr>
+            <tr><td>Fire Oranı</td><td>%${wastePct}</td></tr>
+          </tbody></table>
+        </div>
       </div>
-      <div class="report-print-summary">Toplam: ${fmt(area)} m² · ${order} adet · ${boxes} kutu</div>`;
+
+      <div class="inv-summary-row">
+        <div class="inv-stat"><span>Toplam Alan</span><strong>${fmt(totalArea)} m²</strong></div>
+        <div class="inv-stat"><span>Zemin</span><strong>${fmt(floorArea > 0 ? floorArea : totalArea)} m²</strong></div>
+        <div class="inv-stat"><span>Duvar</span><strong>${fmt(wallArea)} m²</strong></div>
+        <div class="inv-stat"><span>m² Birim Maliyet</span><strong>${formatCurrency(perSqm)}</strong></div>
+        <div class="inv-stat"><span>Toplam Kesim</span><strong>${totalCuts} adet</strong></div>
+      </div>
+
+      ${tileEntries.length > 0 ? `
+      <div class="inv-section-title">Seramik Ürünleri</div>
+      <table class="inv-table">
+        <thead><tr>
+          <th>#</th><th>Ürün / SKU</th><th>Boyut</th><th>Alan (m²)</th>
+          <th>Gerekli</th><th>Sipariş</th><th>Kutu</th>
+          <th>Birim Fiyat</th><th>Toplam</th>
+        </tr></thead>
+        <tbody>${tileEntries.map((e, i) => rowHtml(i + 1, e)).join('')}</tbody>
+      </table>` : ''}
+
+      ${otherEntries.length > 0 ? `
+      <div class="inv-section-title">Armatür &amp; Aksesuar</div>
+      <table class="inv-table">
+        <thead><tr>
+          <th>#</th><th>Ürün / SKU</th><th>Boyut</th><th>Alan (m²)</th>
+          <th>Adet</th><th>Sipariş</th><th>Kutu</th>
+          <th>Birim Fiyat</th><th>Toplam</th>
+        </tr></thead>
+        <tbody>${otherEntries.map((e, i) => fixtureRowHtml(i + 1, e)).join('')}</tbody>
+      </table>` : ''}
+
+      <table class="inv-table inv-totals">
+        <tbody>
+          <tr class="inv-subtotal"><td colspan="8">Ara Toplam (KDV Hariç)</td><td>${formatCurrency(subtotal)}</td></tr>
+          <tr><td colspan="8">KDV (%20)</td><td>${formatCurrency(vat)}</td></tr>
+          <tr class="inv-grand"><td colspan="8">Genel Toplam</td><td>${formatCurrency(grandTotal)}</td></tr>
+        </tbody>
+      </table>
+
+      <div class="inv-footer">
+        ${totalCuts} kesik karo · artıklar birleştirilmez (fire) · Fire oranı: %${wastePct}
+      </div>`;
   }
+
   const prevTitle = document.title;
   const safeModel = String(activeModelId || 'model').replace(/[^\w.-]+/g, '_');
   const d = new Date();
