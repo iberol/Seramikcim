@@ -992,13 +992,11 @@ try {
 
 // RESTORED FLOATING PANELS - Sadece commerce drawer (editor/result artik Bootstrap layout icinde)
 try {
-  registerPanel({
-    id: 'commerce',
-    el: document.querySelector('#commerce-drawer'),
-    defaults: { center: true, width: 900, height: 750 },
-    dragHandle: '.floating-drawer__header',
-    floating: true,
-  });
+  // NOT: commerce paneli floatingPanels'a KAYITLI DEĞİL. Kayıtlı olursa
+  // floatingPanels native header'a kendi (−,×) kontrollerini enjekte edip
+  // native × ile çakışıyor + minimize CSS'i .floating-drawer__header'ı kapsamadığı
+  // için paneli tümden gizliyordu. Panel ortalı modal olarak .floating-drawer CSS'i
+  // ile konumlanır, native commerce-close-btn ile kapanır (commerce.js close()).
   registerPanel({
     id: 'launcher',
     el: document.querySelector('#launcher-panel'),
