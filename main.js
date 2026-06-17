@@ -838,6 +838,44 @@ function setClickOrigin(event) {
   if($('region-y-input')) $('region-y-input').value = fmt(Math.max(0, Math.min(sceneController.metrics.roomDepthM, y)), 2);
 }
 
+/**
+ * printReport — PDF baskısı için rapor başlığını doldurur + dosya adını ayarlar.
+ * @media print kuralı sayfayı yalnız #result-panel + #report-print-header'a indirir,
+ * yani PDF'e sadece hesaplanmış bilgiler + kullanılan seramik/eşya (Envanter Özeti) girer.
+ */
+function printReport() {
+  const header = document.getElementById('report-print-header');
+  if (header) {
+    const modelLabel = formatModelLabel(activeModelId);
+    const src = sceneData?.meta?.source || '';
+    const dateStr = new Date().toLocaleDateString('tr-TR');
+    const area = simulation ? Number(simulation.totalArea || 0) : 0;
+    const order = simulation ? Number(simulation.order || 0) : 0;
+    let boxes = 0;
+    if (simulation?.byProduct) {
+      const entries = simulation.byProduct instanceof Map
+        ? Array.from(simulation.byProduct.values())
+        : Object.values(simulation.byProduct);
+      entries.forEach((e) => { boxes += Number(e.orderBoxes || 0); });
+    }
+    header.innerHTML = `
+      <h2 class="report-print-title">Seramikcim — Kaplama Raporu</h2>
+      <div class="report-print-meta">
+        <span>Model: ${escapeHtml(modelLabel)}${src ? ' · ' + escapeHtml(src) : ''}</span>
+        <span>Tarih: ${escapeHtml(dateStr)}</span>
+      </div>
+      <div class="report-print-summary">Toplam: ${fmt(area)} m² · ${order} adet · ${boxes} kutu</div>`;
+  }
+  const prevTitle = document.title;
+  const safeModel = String(activeModelId || 'model').replace(/[^\w.-]+/g, '_');
+  const d = new Date();
+  const stamp = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  document.title = `Seramikcim_Rapor_${safeModel}_${stamp}`;
+  const restore = () => { document.title = prevTitle; window.removeEventListener('afterprint', restore); };
+  window.addEventListener('afterprint', restore);
+  window.print();
+}
+
 function setupEvents() {
   if(dom.launcherOpenBtn) dom.launcherOpenBtn.addEventListener('click', openLauncherPanel);
   if(dom.launcherCloseBtn) dom.launcherCloseBtn.addEventListener('click', closeLauncherPanel);
@@ -885,7 +923,7 @@ function setupEvents() {
   if($('add-region-btn')) $('add-region-btn').addEventListener('click', addRegion);
   if($('add-opening-btn')) $('add-opening-btn').addEventListener('click', addOpening);
   if($('add-fixture-btn')) $('add-fixture-btn').addEventListener('click', addFixture);
-  if($('print-report-btn')) $('print-report-btn').addEventListener('click', () => window.print());
+  if($('print-report-btn')) $('print-report-btn').addEventListener('click', printReport);
   // Kamera view butonları (yeni HTML'de data-view attribute'u header'da)
   document.querySelectorAll('.chip-btn[data-view]').forEach((button) => button.addEventListener('click', () => {
     sceneController.setCamera(button.dataset.view);

@@ -1120,21 +1120,25 @@ select {
 }
 
 @media print {
+  @page { margin: 1.2cm; }
+
   body {
     overflow: visible;
     background: #fff;
     color: #111;
   }
 
-  #viewer-canvas,
-  .navbar,
-  .commerce-drawer,
-  #loading-overlay {
-    display: none !important;
-  }
+  /* Sağlam izolasyon: her şeyi gizle, yalnız rapor alt-ağacını göster.
+     (3D sahne, header, sol editör paneli, Leva/Sahne Kontrolleri, gizmo otomatik gizlenir) */
+  body * { visibility: hidden !important; }
+  #result-panel, #result-panel *,
+  #report-print-header, #report-print-header * { visibility: visible !important; }
 
-  .result-panel {
-    position: static;
+  #result-panel {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
     max-height: none;
     overflow: visible;
     box-shadow: none;
@@ -1142,6 +1146,33 @@ select {
     background: #fff;
     color: #111;
   }
+
+  /* 4 metrik kutusu üstte; sütunlar A4 için DİKEY yığılır */
+  #result-panel .d-flex {
+    flex-direction: column !important;
+    gap: 10px;
+  }
+  #result-panel .result-col,
+  #result-panel .result-col.border-end {
+    border: 0 !important;
+    border-bottom: 1px solid #ccc !important;
+    width: 100% !important;
+  }
+  /* İçerik kırpılmasın */
+  #result-panel .result-col-body {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+  #result-panel .result-stat,
+  #result-panel .result-value,
+  #result-panel .result-col-header,
+  #result-panel .result-col-body { color: #111 !important; }
+
+  /* Ekranda gizli rapor başlığı baskıda görünür */
+  #report-print-header { display: block !important; margin: 0 0 12px; }
+  .report-print-title { font-size: 18px; font-weight: 700; margin: 0 0 4px; color: #111; }
+  .report-print-meta { display: flex; gap: 18px; font-size: 12px; color: #333; }
+  .report-print-summary { margin-top: 4px; font-size: 13px; font-weight: 600; color: #111; }
 
   .product-card,
   .inventory-card,
