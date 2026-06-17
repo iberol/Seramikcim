@@ -37,3 +37,30 @@ tools/libredwg/*.dll
 tools/libredwg/*.exe
 tools/libredwg/*.so
 tools/libredwg/*.dylib
+
+# Kişisel / müşteri dosyaları
+musteri_*.pdf
+*.pdf
+
+# Yerel hata ayıklama ekran görüntüleri
+wall-planes-doğrulama*.png
+Ekran görüntüsü*.png
+
+# SketchUp ikili dosyaları
+*.skp
+
+# Word ikili dökümanlar
+docs/word/*.docx
+
+# DWG test dosyaları
+ornekler/*.dwg
+
+# Loose material dosyaları
+material.mtl
+material_0.png
+
+# Claude yerel ayarlar
+.claude/settings.local.json
+
+# Üretilen mesh (aktif simülasyon)
+public/current_mesh.obj
